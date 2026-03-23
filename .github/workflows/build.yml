@@ -1,0 +1,73 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.5'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Build APK
+      run: flutter build apk --release
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
+
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/app/outputs/flutter-apk/app-release.apk
+        tag_name: v1.0.0
+        name: Release v1.0.0
+        body: |
+          ## 私密备忘录 v1.0.0
+
+          ### 功能特性
+          - 🔐 密码本：安全存储账号密码
+          - 🎂 纪念日：支持农历和公历
+          - 📜 证书管理：过期检测
+          - 💰 还款提醒：进度追踪
+          - ⏰ 有效期提醒：多类型支持
+
+          ### 安全特性
+          - AES-256 数据加密
+          - SQLCipher 数据库加密
+          - 生物识别认证
+          - 本地存储不上传云端
+
+          ### 安装说明
+          1. 下载 `app-release.apk`
+          2. 在 Android 手机上安装
+          3. 首次启动设置密码
+          4. 开始使用
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
