@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'screens/home_screen.dart';
 import 'screens/password_screen.dart';
 import 'screens/anniversary_screen.dart';
 import 'screens/certificate_screen.dart';
 import 'screens/repayment_screen.dart';
 import 'screens/expiry_screen.dart';
+import 'services/approval_service.dart';
+import 'database/database_helper.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +29,18 @@ void main() {
     ),
   );
   
-  runApp(const PrivateMemoApp());
+  runApp(
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => ApprovalBloc(DatabaseHelper.instance)
+            ..add(const LoadApprovals())
+            ..add(const GetPendingCount()),
+        ),
+      ],
+      child: const PrivateMemoApp(),
+    ),
+  );
 }
 
 class PrivateMemoApp extends StatelessWidget {

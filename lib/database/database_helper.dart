@@ -8,6 +8,7 @@ import '../models/anniversary_item.dart';
 import '../models/certificate_item.dart';
 import '../models/repayment_item.dart';
 import '../models/expiry_item.dart';
+import '../models/approval_item.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -19,6 +20,7 @@ class DatabaseHelper {
   static const String _tableCertificates = 'certificates';
   static const String _tableRepayments = 'repayments';
   static const String _tableExpiries = 'expiries';
+  static const String _tableApprovals = 'approvals';
 
   // 加密密钥（实际应用中应该从安全存储中获取）
   static const String _key = 'your-32-byte-secret-key-1234567890abcdef';
@@ -126,6 +128,21 @@ class DatabaseHelper {
         imageUrl TEXT,
         isReminderEnabled INTEGER DEFAULT 1,
         reminderOffsetDays INTEGER DEFAULT 7
+      )
+    ''');
+
+    // 审批表
+    await db.execute('''
+      CREATE TABLE $_tableApprovals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        applicant TEXT NOT NULL,
+        approver TEXT NOT NULL,
+        status TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        notes TEXT,
+        approvedAt TEXT,
+        approvedBy TEXT
       )
     ''');
   }
@@ -379,6 +396,105 @@ class DatabaseHelper {
     );
   }
 
+  // ==================== 审批 ====================
+  Future<List<ApprovalItem>> getAllApprovals() async {
+    final db = await instance.database;
+    final result = await db.query(
+      _tableApprovals,
+      orderBy: 'createdAt DESC',
+    );
+    return result.map((json) => ApprovalItem.fromJson(json)).toList();
+  }
+
+  Future<ApprovalItem?> getApprovalById(String id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      _tableApprovals,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (result.isEmpty) return null;
+    return ApprovalItem.fromJson(result.first);
+  }
+
+  Future<int> insertApproval(ApprovalItem item) async {
+    final db = await instance.database;
+    return db.insert(_tableApprovals, item.toJson());
+  }
+
+  Future<int> updateApproval(ApprovalItem item) async {
+    final db = await instance.database;
+    return db.update(
+      _tableApprovals,
+      item.toJson(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  Future<int> deleteApproval(String id) async {
+    final db = await instance.database;
+    return db.delete(
+      _tableApprovals,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> updateApprovalStatus(String id, ApprovalStatus status, {String? approver}) async {
+    final db = await instance.database;
+    final now = DateTime.now().toIso8601String();
+    return db.update(
+      _tableApprovals,
+      {
+        'status': status.name,
+        'approvedAt': now,
+        'approvedBy': approver,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ==================== 审批统计 ====================
+  Future<int> getPendingApprovalCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM $_tableApprovals WHERE status = ?',
+      ['pending'],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getApprovedCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM $_tableApprovals WHERE status = ?',
+      ['approved'],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getRejectedCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM $_tableApprovals WHERE status = ?',
+      ['rejected'],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<List<ApprovalItem>> getPendingApprovals() async {
+    final db = await instance.database;
+    final result = await db.query(
+      _tableApprovals,
+      where: 'status = ?',
+      whereArgs: ['pending'],
+      orderBy: 'createdAt ASC',
+    );
+    return result.map((json) => ApprovalItem.fromJson(json)).toList();
+  }
+
   // ==================== 清空所有数据 ====================
   Future<void> clearAllTables() async {
     final db = await instance.database;
@@ -387,6 +503,7 @@ class DatabaseHelper {
     await db.delete(_tableCertificates);
     await db.delete(_tableRepayments);
     await db.delete(_tableExpiries);
+    await db.delete(_tableApprovals);
   }
 
   // ==================== 数据库迁移 ====================

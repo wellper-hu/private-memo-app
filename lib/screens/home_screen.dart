@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'password_screen.dart';
 import 'anniversary_screen.dart';
 import 'certificate_screen.dart';
 import 'repayment_screen.dart';
 import 'expiry_screen.dart';
+import 'approval_center_screen.dart';
+import '../services/approval_service.dart';
+import '../database/database_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,21 +45,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
-        destinations: List.generate(
-          _titles.length,
-          (index) => NavigationDestination(
-            icon: Icon(_icons[index]),
-            label: _titles[index],
+    return BlocProvider(
+      create: (context) => ApprovalBloc(DatabaseHelper.instance)
+        ..add(const LoadApprovals())
+        ..add(const GetPendingCount()),
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) {
+            setState(() => _currentIndex = index);
+          },
+          destinations: List.generate(
+            _titles.length,
+            (index) => NavigationDestination(
+              icon: Icon(_icons[index]),
+              label: _titles[index],
+            ),
           ),
         ),
       ),
@@ -171,60 +180,76 @@ class DashboardScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '快捷入口',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+      body: BlocBuilder<ApprovalBloc, ApprovalState>(
+        builder: (context, state) {
+          int pendingCount = 0;
+          if (state is PendingCountLoaded) {
+            pendingCount = state.count;
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '快捷入口',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    children: [
+                      QuickAccessCard(
+                        title: '密码本',
+                        icon: Icons.lock,
+                        color: Colors.blue,
+                        onTap: () => _navigateTo(context, const PasswordScreen()),
+                      ),
+                      QuickAccessCard(
+                        title: '纪念日',
+                        icon: Icons.cake,
+                        color: Colors.purple,
+                        onTap: () => _navigateTo(context, const AnniversaryScreen()),
+                      ),
+                      QuickAccessCard(
+                        title: '证书管理',
+                        icon: Icons.verified_user,
+                        color: Colors.green,
+                        onTap: () => _navigateTo(context, const CertificateScreen()),
+                      ),
+                      QuickAccessCard(
+                        title: '还款提醒',
+                        icon: Icons.account_balance_wallet,
+                        color: Colors.orange,
+                        onTap: () => _navigateTo(context, const RepaymentScreen()),
+                      ),
+                      QuickAccessCard(
+                        title: '有效期提醒',
+                        icon: Icons.timer,
+                        color: Colors.red,
+                        onTap: () => _navigateTo(context, const ExpiryScreen()),
+                      ),
+                      QuickAccessCard(
+                        title: '审批中心',
+                        icon: Icons.approval,
+                        color: Colors.teal,
+                        onTap: () => _navigateTo(context, const ApprovalCenterScreen()),
+                        badgeCount: pendingCount > 0 ? pendingCount : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                children: [
-                  QuickAccessCard(
-                    title: '密码本',
-                    icon: Icons.lock,
-                    color: Colors.blue,
-                    onTap: () => _navigateTo(context, const PasswordScreen()),
-                  ),
-                  QuickAccessCard(
-                    title: '纪念日',
-                    icon: Icons.cake,
-                    color: Colors.purple,
-                    onTap: () => _navigateTo(context, const AnniversaryScreen()),
-                  ),
-                  QuickAccessCard(
-                    title: '证书管理',
-                    icon: Icons.verified_user,
-                    color: Colors.green,
-                    onTap: () => _navigateTo(context, const CertificateScreen()),
-                  ),
-                  QuickAccessCard(
-                    title: '还款提醒',
-                    icon: Icons.account_balance_wallet,
-                    color: Colors.orange,
-                    onTap: () => _navigateTo(context, const RepaymentScreen()),
-                  ),
-                  QuickAccessCard(
-                    title: '有效期提醒',
-                    icon: Icons.timer,
-                    color: Colors.red,
-                    onTap: () => _navigateTo(context, const ExpiryScreen()),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
